@@ -1,5 +1,5 @@
 import base64  # noqa: I001
-
+import time
 import requests
 from flask import Blueprint, abort
 from flask import current_app as app
@@ -8,7 +8,7 @@ from itsdangerous.exc import BadSignature, BadTimeSignature, SignatureExpired
 
 from CTFd.cache import clear_team_session, clear_user_session
 from CTFd.models import Teams, UserFieldEntries, UserFields, Users, db
-from CTFd.utils import config, email, get_app_config, get_config
+from CTFd.utils import config, email, get_app_config, get_config ,set_config
 from CTFd.utils import user as current_user
 from CTFd.utils import validators
 from CTFd.utils.config import is_teams_mode
@@ -418,7 +418,7 @@ def oauth_login():
     endpoint = (
         get_app_config("OAUTH_AUTHORIZATION_ENDPOINT")
         or get_config("oauth_authorization_endpoint")
-        or "https://auth.majorleaguecyber.org/oauth/authorize"
+        #or "http://0.0.0.0:8080/realms/master/protocol/openid-connect/auth"
     )
 
     if get_config("user_mode") == "teams":
@@ -432,7 +432,7 @@ def oauth_login():
         error_for(
             endpoint="auth.login",
             message="OAuth Settings not configured. "
-            "Ask your CTF administrator to configure MajorLeagueCyber integration.",
+            "Ask your CTF administrator to configure Keycloak integration.",
         )
         return redirect(url_for("auth.login"))
 
@@ -446,6 +446,7 @@ def oauth_login():
 @ratelimit(method="GET", limit=10, interval=60)
 def oauth_redirect():
     oauth_code = request.args.get("code")
+    print("oauth_code is : ",oauth_code)
     state = request.args.get("state")
     if session["nonce"] != state:
         log("logins", "[{date}] {ip} - OAuth State validation mismatch")
@@ -454,41 +455,62 @@ def oauth_redirect():
 
     if oauth_code:
         url = (
-            get_app_config("OAUTH_TOKEN_ENDPOINT")
-            or get_config("oauth_token_endpoint")
-            or "https://auth.majorleaguecyber.org/oauth/token"
+            #get_app_config("OAUTH_TOKEN_ENDPOINT")
+            get_config("oauth_token_endpoint")
+            #or "http://0.0.0.0:8080/realms/master/protocol/openid-connect/token"
         )
+        print("--------------------")
+        print("trying to obtain hint");
+        print("--------------------")
+        print("flag 1")
+        client_id = get_config("oauth_client_id")
+        #get_app_config("OAUTH_CLIENT_ID") or
+        client_secret = get_app_config("OAUTH_CLIENT_SECRET") or get_config("oauth_client_secret")
+        print("flag 2")
 
-        client_id = get_app_config("OAUTH_CLIENT_ID") or get_config("oauth_client_id")
-        client_secret = get_app_config("OAUTH_CLIENT_SECRET") or get_config(
-            "oauth_client_secret"
-        )
         headers = {"content-type": "application/x-www-form-urlencoded"}
+        print("flag 3")
         data = {
             "code": oauth_code,
             "client_id": client_id,
             "client_secret": client_secret,
-            "grant_type": "authorization_code",
+            "grant_type": "authorization_code"
         }
+        print("client secret is ",client_secret)
+        print("client id is ",client_id)
         token_request = requests.post(url, data=data, headers=headers)
-
+        print("flag 4")
+        print(url)
+        print("request is ,",token_request.status_code)
         if token_request.status_code == requests.codes.ok:
-            token = token_request.json()["access_token"]
-            user_url = (
-                get_app_config("OAUTH_API_ENDPOINT")
-                or get_config("oauth_api_endpoint")
-                or "https://api.majorleaguecyber.org/user"
-            )
+            print("Debugger: auth.py token_request.status_code",token_request.status_code)
+            print("Debugger: auth.py requests.codes.ok",requests.codes.ok)
+            print("XXXXXXXXXXXXXXXXXXXDebugger: auth.py - entered the token it is okay")
 
+            print("the whole token is :",token_request.json())
+            token = token_request.json()["access_token"]
+            
+            user_url = (
+                #get_app_config("OAUTH_API_ENDPOINT")
+                get_config("oauth_api_endpoint")
+                #or "http://0.0.0.0:8080/realms/master/protocol/openid-connect/userinfo"
+            )
+            print("the url of api is ",user_url)
             headers = {
                 "Authorization": "Bearer " + str(token),
                 "Content-type": "application/json",
             }
+            print("---------------------")
+                        
             api_data = requests.get(url=user_url, headers=headers).json()
-
-            user_id = api_data["id"]
-            user_name = api_data["name"]
+            print("this is the api_data",api_data)
+            
+            user_id = api_data["sub"]
+            user_name = api_data["preferred_username"]
             user_email = api_data["email"]
+            user_type = "user"
+            if 'administrator' in api_data.get('roles', []):
+                user_type="admin"
 
             user = Users.query.filter_by(email=user_email).first()
             if user is None:
@@ -503,11 +525,17 @@ def oauth_redirect():
 
                 # Check if we are allowing registration before creating users
                 if registration_visible() or mlc_registration():
+                    user_hidden=False
+                    if user_type=="admin":
+                        user_hidden=True
+
                     user = Users(
                         name=user_name,
                         email=user_email,
                         oauth_id=user_id,
-                        verified=True,
+                        hidden=user_hidden,
+                        type=user_type,        #default user is "user"
+                        verified=True
                     )
                     db.session.add(user)
                     db.session.commit()
@@ -559,7 +587,7 @@ def oauth_redirect():
                 clear_user_session(user_id=user.id)
 
             login_user(user)
-
+            set_config("keycloak_login",True)
             return redirect(url_for("challenges.listing"))
         else:
             log("logins", "[{date}] {ip} - OAuth token retrieval failure")
@@ -577,4 +605,39 @@ def oauth_redirect():
 def logout():
     if current_user.authed():
         logout_user()
-    return redirect(url_for("views.static_html"))
+        print("LOGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
+    print("about to logout.................................")
+    
+    if get_config("keycloak_login")==False:
+        print("logged in without using sso ")
+        return redirect(url_for("views.static_html"))
+    print("the user is gone far away000000000000000000000000000000000000000000000000000000000")
+    url = (
+            #get_app_config("OAUTH_TOKEN_ENDPOINT")
+            get_config("oauth_token_endpoint")
+            # "http://0.0.0.0:8080/realms/master/protocol/openid-connect/token"
+            #for testing purposes we used this realm token
+        )
+    url_logout=url[:-5] #remove 'token' word
+    print("this is me the url ",url_logout)
+    url_logout+="logout?post_logout_redirect_uri=http%3A%2F%2F127.0.0.1%3A4000%2F&id_token_hint="
+                #append the redirection_page "login" after logout
+    print("--------------------")
+    print("THE KEYCLOAK TOKEN FOR THE LOG OUT");
+    print("--------------------")
+    client_id = get_app_config("OAUTH_CLIENT_ID") or get_config("oauth_client_id")
+    client_secret = get_app_config("OAUTH_CLIENT_SECRET") or get_config( "oauth_client_secret")
+    headers_logout = {"content-type": "application/x-www-form-urlencoded"}
+    data = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "grant_type": "client_credentials",
+        "scope" : "openid"
+    }
+    token_request_logout = requests.post(url, data=data, headers=headers_logout)
+    print("this is the token for the logout ",token_request_logout.json())
+    id_token_hint=token_request_logout.json()["id_token"]
+    print("this is the id_token_hint is ",id_token_hint)
+    url_logout+=id_token_hint #apend the id_token_hint to e logout url
+    set_config("keycloak_login",False)
+    return redirect(url_logout)

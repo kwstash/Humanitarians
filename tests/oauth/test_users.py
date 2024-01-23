@@ -10,11 +10,11 @@ def test_num_users_oauth_limit():
     app = create_ctfd()
     app.config.update(
         {
-            "OAUTH_CLIENT_ID": "ctfd_testing_client_id",
-            "OAUTH_CLIENT_SECRET": "ctfd_testing_client_secret",
-            "OAUTH_AUTHORIZATION_ENDPOINT": "http://auth.localhost/oauth/authorize",
-            "OAUTH_TOKEN_ENDPOINT": "http://auth.localhost/oauth/token",
-            "OAUTH_API_ENDPOINT": "http://api.localhost/user",
+            "OAUTH_CLIENT_ID": "ctfd_client",
+            "OAUTH_CLIENT_SECRET": "SAhU01UDmyY7AHFH5B47o3L0qIAQLQkf",
+            "OAUTH_AUTHORIZATION_ENDPOINT": "http://0.0.0.0:8080/realms/master/protocol/openid-connect/auth",
+            "OAUTH_TOKEN_ENDPOINT": "http://0.0.0.0:8080/realms/master/protocol/openid-connect/token",
+            "OAUTH_API_ENDPOINT": "http://0.0.0.0:8080/realms/master/protocol/openid-connect/userinfo",
         }
     )
     with app.app_context():

@@ -16,7 +16,7 @@
 
         {% if integrations.mlc() %}
           <a class="btn btn-secondary btn-lg btn-block w-100" href="{{ url_for('auth.oauth_login') }}">
-            Login with Major League Cyber
+            Login with Modified Keycloak instance
           </a>
 
           <hr>
@@ -37,7 +37,7 @@
             <div class="row pt-3">
               <div class="col-6 col-md-8">
                 <a class="align-middle" href="{{ url_for('auth.reset_password') }}">
-                  {% trans %}Forgot your password?{% endtrans %}
+                  {% trans %}Forgot password? We got you!{% endtrans %}
                 </a>
               </div>
 

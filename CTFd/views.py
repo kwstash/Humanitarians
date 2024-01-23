@@ -69,7 +69,6 @@ from CTFd.utils.user import authed, get_current_team, get_current_user, is_admin
 
 views = Blueprint("views", __name__)
 
-
 @views.route("/setup", methods=["GET", "POST"])
 def setup():
     errors = get_errors()
@@ -221,7 +220,6 @@ def setup():
     </div>
 </div>"""
             page.content = index
-
             # Visibility
             set_config(ConfigTypes.CHALLENGE_VISIBILITY, challenge_visibility)
             set_config(ConfigTypes.REGISTRATION_VISIBILITY, registration_visibility)
@@ -392,6 +390,9 @@ def static_html(route):
     :param route:
     :return:
     """
+    set_config("keycloak_login",False)
+    print("------------------TAKE THE HINT --------------------HINT")
+    print("value is ",get_config("keycloak_login"))
     page = get_page(route)
     if page is None:
         abort(404)
