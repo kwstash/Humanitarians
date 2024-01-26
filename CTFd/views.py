@@ -390,9 +390,10 @@ def static_html(route):
     :param route:
     :return:
     """
+    #Tracks if conected user is logged in using Keycloak
+    #Helps with logout because the procedure is different.
     set_config("keycloak_login",False)
-    print("------------------TAKE THE HINT --------------------HINT")
-    print("value is ",get_config("keycloak_login"))
+    
     page = get_page(route)
     if page is None:
         abort(404)
